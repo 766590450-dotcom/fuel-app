@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <title>油耗·保养管家</title>
+  <link rel="manifest" href="data:application/manifest+json,
+  {
+    %22name%22: %22油耗保养%22,
+    %22short_name%22: %22油耗%22,
+    %22start_url%22: %22.%22,
+    %22display%22: %22standalone%22,
+    %22background_color%22: %22%23f0f4f8%22,
+    %22theme_color%22: %22%233b82f6%22,
+    %22icons%22: [
+      {
+        %22src%22: %22data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%233b82f6'/%3E%3Ctext x='50' y='68' font-size='50' text-anchor='middle' fill='white'%3E⛽%3C/text%3E%3C/svg%3E%22,
+        %22sizes%22: %22100x100%22,
+        %22type%22: %22image/svg+xml%22
+      }
+    ]
+  }">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%233b82f6'/%3E%3Ctext x='50' y='68' font-size='50' text-anchor='middle' fill='white'%3E⛽%3C/text%3E%3C/svg%3E">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f0f4f8;color:#1e293b;padding:16px;max-width:500px;margin:0 auto;}
+    h1{font-size:1.5rem;margin-bottom:12px;display:flex;align-items:center;gap:6px;}
+    .card{background:white;border-radius:20px;padding:16px;box-shadow:0 4px 12px rgba(0,0,0,0.06);margin-bottom:16px;}
+    .flex{display:flex;gap:8px;align-items:center;}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+    .field label{display:block;font-size:0.8rem;color:#64748b;margin-bottom:4px;}
+    .field input,.field select{width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:12px;font-size:1rem;background:#f8fafc;}
+    button{background:#3b82f6;color:white;border:none;padding:12px;border-radius:14px;font-size:0.95rem;width:100%;font-weight:600;cursor:pointer;transition:0.2s;display:flex;align-items:center;justify-content:center;gap:4px;}
+    button:active{background:#2563eb;}
+    .btn-sm{padding:8px 12px;font-size:0.8rem;width:auto;}
+    .danger{background:#ef4444;}
+    .warning{background:#f59e0b;}
+    .success{background:#10b981;}
+    .stat-row{display:flex;justify-content:space-between;margin:8px 0;}
+    .stat-label{color:#475569;}
+    .stat-value{font-weight:700;color:#3b82f6;font-size:1.1rem;}
+    table{width:100%;border-collapse:collapse;font-size:0.8rem;}
+    th,td{padding:6px 4px;text-align:left;border-bottom:1px solid #e2e8f0;}
+    th{color:#64748b;font-weight:500;}
+    .photo-thumb{width:40px;height:40px;object-fit:cover;border-radius:8px;cursor:pointer;}
+    .hidden{display:none;}
+    #photoPreview img{max-width:100%;max-height:200px;border-radius:12px;margin-top:8px;}
+    .tab-bar{display:flex;gap:4px;margin-bottom:12px;}
+    .tab{flex:1;text-align:center;padding:10px;background:#e2e8f0;border-radius:12px;font-size:0.85rem;font-weight:600;color:#475569;cursor:pointer;}
+    .tab.active{background:#3b82f6;color:white;}
+    .tab-content{display:none;}
+    .tab-content.active{display:block;}
+  </style>
+</head>
+<body>
+  <h1>⛽ 油耗·保养管家</h1>
+
+  <!-- 车辆选择 -->
+  <div class="card" style="display:flex;align-items:center;gap:8px;">
+    <select id="carSelect" style="flex:1;padding:10px;border-radius:12px;border:1px solid #cbd5e1;background:#f8fafc;">
+      <option value="默认">🚗 默认车辆</option>
+    </select>
+    <button class="btn-sm" onclick="addCar()">➕ 车辆</button>
+  </div>
+
+  <!-- 综合统计 -->
+  <div class="card">
+    <div class="stat-row"><span class="stat-label">📊 最近油耗</span><span class="stat-value" id="recentLp100">-- L/100km</span></div>
+    <div class="stat-row"><span class="stat-label">💰 每公里油费</span><span class="stat-value" id="recentCostPerKm">-- 元/km</span></div>
+    <div class="stat-row"><span class="stat-label">🔧 保养总支出</span><span class="stat-value" id="totalMaintCost">0 元</span></div>
+    <div class="stat-row" style="border-top:2px solid #e2e8f0;padding-top:8px;">
+      <span class="stat-label">🧾 综合每公里成本</span>
+      <span class="stat-value" style="color:#059669;" id="totalCostPerKm">-- 元/km</span>
+    </div>
+  </div>
+
+  <!-- 标签切换：加油 / 保养 / 记录 -->
+  <div class="tab-bar">
+    <div class="tab active" onclick="switchTab('fuel')">⛽ 加油</div>
+    <div class="tab" onclick="switchTab('maint')">🔧 保养</div>
+    <div class="tab" onclick="switchTab('history')">📋 记录</div>
+  </div>
+
+  <!-- 加油录入 -->
+  <div id="tab-fuel" class="tab-content active">
+    <div class="card">
+      <div class="grid">
+        <div class="field"><label>当前里程 (km)</label><input type="number" id="odo" placeholder="12345" inputmode="decimal"></div>
+        <div class="field"><label>加油量 (L)</label><input type="number" id="fuel" placeholder="45.8" step="0.01" inputmode="decimal"></div>
+        <div class="field"><label>油价 (元/L)</label><input type="number" id="price" placeholder="8.32" step="0.01" inputmode="decimal"></div>
+        <div class="field"><label>总花费 (元)</label><input type="number" id="total" placeholder="381.06" step="0.01" inputmode="decimal"></div>
+      </div>
+      <div style="margin-top:12px;">
+        <label style="font-size:0.8rem;color:#64748b;">拍照存证</label>
+        <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:block;margin-top:4px;">
+        <div id="photoPreview"></div>
+      </div>
+      <button onclick="addFuelRecord()" style="margin-top:12px;">📸 添加加油记录</button>
+    </div>
+  </div>
+
+  <!-- 保养录入 -->
+  <div id="tab-maint" class="tab-content">
+    <div class="card">
+      <div class="grid">
+        <div class="field"><label>日期</label><input type="date" id="maintDate"></div>
+        <div class="field"><label>里程 (km)</label><input type="number" id="maintOdo" placeholder="15000"></div>
+        <div class="field"><label>项目</label><input type="text" id="maintItem" placeholder="更换机油机滤"></div>
+        <div class="field"><label>费用 (元)</label><input type="number" id="maintCost" placeholder="580" step="0.01"></div>
+      </div>
+      <button onclick="addMaintRecord()" style="margin-top:12px;">🔧 添加保养记录</button>
+    </div>
+  </div>
+
+  <!-- 历史记录 -->
+  <div id="tab-history" class="tab-content">
+    <div class="card" style="padding:12px;">
+      <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <button class="btn-sm" onclick="exportCSV()">📤 导出油耗CSV</button>
+        <button class="btn-sm warning" onclick="exportFullBackup()">💾 完整备份</button>
+        <button class="btn-sm success" onclick="document.getElementById('importFile').click()">📥 导入备份</button>
+        <input type="file" id="importFile" accept=".json" class="hidden" onchange="importBackup(event)">
+      </div>
+      <div style="overflow-x:auto;">
+        <table id="historyTable">
+          <thead><tr><th>类型</th><th>里程/日期</th><th>详情</th><th>油耗/费用</th><th>照片</th><th>操作</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ---------- 数据库 ----------
+    const STORAGE_KEY = 'fuelRecords_v2';
+    const MAINT_KEY = 'maintRecords_v2';
+    const CARS_KEY = 'myCars_v2';
+    let fuelRecords = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    let maintRecords = JSON.parse(localStorage.getItem(MAINT_KEY) || '[]');
+    let cars = JSON.parse(localStorage.getItem(CARS_KEY) || '["默认"]');
+
+    // IndexedDB 照片存储
+    const DB_NAME = 'FuelAppDB';
+    const STORE_NAME = 'photos';
+    let db;
+
+    function openDB() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, 1);
+        request.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(STORE_NAME)) {
+            db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+          }
+        };
+        request.onsuccess = (e) => { db = e.target.result; resolve(db); };
+        request.onerror = (e) => reject(e.target.error);
+      });
+    }
+
+    function savePhoto(id, base64) {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        store.put({ id, data: base64 });
+        tx.oncomplete = resolve;
+        tx.onerror = reject;
+      });
+    }
+
+    function getPhoto(id) {
+      return new Promise((resolve) => {
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.get(id);
+        req.onsuccess = () => resolve(req.result?.data || null);
+        req.onerror = () => resolve(null);
+      });
+    }
+
+    function deletePhoto(id) {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      tx.objectStore(STORE_NAME).delete(id);
+    }
+
+    function saveAll() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(fuelRecords));
+      localStorage.setItem(MAINT_KEY, JSON.stringify(maintRecords));
+      localStorage.setItem(CARS_KEY, JSON.stringify(cars));
+    }
+
+    // 车辆
+    function renderCarSelect() {
+      const sel = document.getElementById('carSelect');
+      sel.innerHTML = cars.map(c => `<option value="${c}">🚗 ${c}</option>`).join('');
+    }
+    window.addCar = function() {
+      const name = prompt('车辆名称（如 苏A·蓝）:');
+      if (name && !cars.includes(name)) { cars.push(name); saveAll(); renderCarSelect(); }
+    };
+
+    function getCurrentCar() {
+      return document.getElementById('carSelect').value || '默认';
+    }
+
+    // 油耗计算
+    function calcFuelStats(records) {
+      const sorted = [...records].sort((a,b) => a.odometer - b.odometer);
+      let results = [];
+      for (let i = 1; i < sorted.length; i++) {
+        const prev = sorted[i-1], curr = sorted[i];
+        const dist = curr.odometer - prev.odometer;
+        if (dist <= 0) continue;
+        results.push({ ...curr, dist, lPer100: (curr.fuel/dist*100).toFixed(2), costPerKm: (curr.total/dist).toFixed(4) });
+      }
+      return results;
+    }
+
+    function updateStats() {
+      const car = getCurrentCar();
+      const carFuel = fuelRecords.filter(r => r.car === car);
+      const stats = calcFuelStats(carFuel);
+      const last = stats[stats.length-1];
+      document.getElementById('recentLp100').textContent = last ? `${last.lPer100} L/100km` : '--';
+      document.getElementById('recentCostPerKm').textContent = last ? `${last.costPerKm} 元/km` : '--';
+
+      // 综合成本
+      const carMaint = maintRecords.filter(r => r.car === car);
+      const totalFuelCost = carFuel.reduce((s, r) => s + r.total, 0);
+      const totalMaintCost = carMaint.reduce((s, r) => s + r.cost, 0);
+      document.getElementById('totalMaintCost').textContent = totalMaintCost.toFixed(2) + ' 元';
+
+      if (carFuel.length >= 2) {
+        const minOdo = Math.min(...carFuel.map(r => r.odometer));
+        const maxOdo = Math.max(...carFuel.map(r => r.odometer));
+        const totalDist = maxOdo - minOdo;
+        const totalCost = totalFuelCost + totalMaintCost;
+        const costPerKm = totalDist > 0 ? (totalCost / totalDist).toFixed(4) : '--';
+        document.getElementById('totalCostPerKm').textContent = costPerKm + ' 元/km';
+      } else {
+        document.getElementById('totalCostPerKm').textContent = '-- 元/km';
+      }
+    }
+
+    // 加油记录
+    window.addFuelRecord = async function() {
+      const odometer = parseFloat(document.getElementById('odo').value);
+      const fuel = parseFloat(document.getElementById('fuel').value);
+      const price = parseFloat(document.getElementById('price').value);
+      const total = parseFloat(document.getElementById('total').value);
+      const car = getCurrentCar();
+      if (isNaN(odometer)||isNaN(fuel)||isNaN(price)||isNaN(total)) return alert('请完整填写');
+
+      const id = Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+      const fileInput = document.getElementById('photoInput');
+      let photoData = null;
+      if (fileInput.files[0]) {
+        photoData = await readFileAsBase64(fileInput.files[0]);
+        await savePhoto(id, photoData);
+      }
+
+      fuelRecords.push({ id, car, odometer, fuel, price, total, date: new Date().toISOString(), hasPhoto: !!photoData });
+      saveAll();
+      document.getElementById('odo').value = document.getElementById('fuel').value = document.getElementById('price').value = document.getElementById('total').value = '';
+      fileInput.value = ''; document.getElementById('photoPreview').innerHTML = '';
+      refreshAll();
+    };
+
+    function readFileAsBase64(file) {
+      return new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // 保养记录
+    window.addMaintRecord = function() {
+      const date = document.getElementById('maintDate').value;
+      const odometer = parseFloat(document.getElementById('maintOdo').value);
+      const item = document.getElementById('maintItem').value.trim();
+      const cost = parseFloat(document.getElementById('maintCost').value);
+      const car = getCurrentCar();
+      if (!date || isNaN(odometer) || !item || isNaN(cost)) return alert('请完整填写保养信息');
+      const id = 'm' + Date.now().toString(36);
+      maintRecords.push({ id, car, date, odometer, item, cost });
+      saveAll();
+      document.getElementById('maintDate').value = document.getElementById('maintOdo').value = document.getElementById('maintItem').value = document.getElementById('maintCost').value = '';
+      refreshAll();
+    };
+
+    // 历史记录渲染
+    async function renderHistory() {
+      const car = getCurrentCar();
+      const carFuel = fuelRecords.filter(r => r.car === car);
+      const carMaint = maintRecords.filter(r => r.car === car);
+      const fuelStats = calcFuelStats(carFuel);
+      // 合并列表
+      let rows = [];
+      // 加油记录（带油耗）
+      fuelStats.forEach(r => {
+        rows.push({ type:'⛽ 加油', date: r.date?.slice(0,10), odo: r.odometer, detail: `${r.fuel}L`, costOrLp: `${r.lPer100} L/100km`, id: r.id, hasPhoto: r.hasPhoto });
+      });
+      carMaint.forEach(r => {
+        rows.push({ type:'🔧 保养', date: r.date, odo: r.odometer, detail: r.item, costOrLp: `${r.cost}元`, id: r.id, hasPhoto: false });
+      });
+      rows.sort((a,b) => (b.odo||0) - (a.odo||0)); // 按里程倒序
+      const tbody = document.querySelector('#historyTable tbody');
+      tbody.innerHTML = '';
+      for (let row of rows) {
+        const tr = document.createElement('tr');
+        let photoHtml = '';
+        if (row.hasPhoto) {
+          photoHtml = `<img class="photo-thumb" src="#" data-id="${row.id}" onclick="showPhoto('${row.id}')" alt="照片">`;
+          // 异步加载缩略图
+          getPhoto(row.id).then(b64 => {
+            const img = tr.querySelector(`img[data-id="${row.id}"]`);
+            if (img && b64) img.src = b64;
+            else if (img) img.style.display = 'none';
+          });
+        }
+        tr.innerHTML = `
+          <td>${row.type}</td>
+          <td>${row.odo || row.date}</td>
+          <td>${row.detail}</td>
+          <td>${row.costOrLp}</td>
+          <td>${photoHtml}</td>
+          <td><button class="btn-sm danger" onclick="deleteItem('${row.id}')">删</button></td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    window.showPhoto = async function(id) {
+      const b64 = await getPhoto(id);
+      if (b64) {
+        const win = window.open('', '_blank');
+        win.document.write(`<img src="${b64}" style="max-width:100%;height:auto;">`);
+      }
+    };
+
+    window.deleteItem = async function(id) {
+      if (!confirm('确认删除这条记录？')) return;
+      if (id.startsWith('m')) {
+        maintRecords = maintRecords.filter(r => r.id !== id);
+      } else {
+        fuelRecords = fuelRecords.filter(r => r.id !== id);
+        deletePhoto(id);
+      }
+      saveAll();
+      refreshAll();
+    };
+
+    // 导出/导入
+    window.exportCSV = function() {
+      const car = getCurrentCar();
+      const stats = calcFuelStats(fuelRecords.filter(r=>r.car===car));
+      let csv = '日期,里程,加油量,总价,油耗(L/100km),每公里油费\n';
+      stats.forEach(r => csv += `${r.date?.slice(0,10)},${r.odometer},${r.fuel},${r.total},${r.lPer100},${r.costPerKm}\n`);
+      downloadBlob(csv, `油耗_${car}.csv`, 'text/csv');
+    };
+
+    window.exportFullBackup = async function() {
+      const backup = { fuelRecords, maintRecords, cars, photos: {} };
+      for (let r of fuelRecords) {
+        if (r.hasPhoto) backup.photos[r.id] = await getPhoto(r.id);
+      }
+      const json = JSON.stringify(backup);
+      downloadBlob(json, `油耗保养完整备份_${new Date().toISOString().slice(0,10)}.json`, 'application/json');
+    };
+
+    window.importBackup = async function(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      if (!confirm('导入备份将覆盖现有所有数据，确定吗？')) { event.target.value = ''; return; }
+      const text = await file.text();
+      try {
+        const data = JSON.parse(text);
+        fuelRecords = data.fuelRecords || [];
+        maintRecords = data.maintRecords || [];
+        cars = data.cars || ['默认'];
+        saveAll();
+        // 恢复照片
+        if (data.photos) {
+          for (let [id, b64] of Object.entries(data.photos)) {
+            await savePhoto(id, b64);
+          }
+        }
+        refreshAll();
+        alert('数据恢复成功！');
+      } catch (e) {
+        alert('备份文件格式错误');
+      }
+      event.target.value = '';
+    };
+
+    function downloadBlob(content, filename, type) {
+      const blob = new Blob(['\uFEFF' + content], { type: `${type};charset=utf-8;` });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+    }
+
+    // 标签切换
+    window.switchTab = function(tab) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      document.querySelector(`.tab:${tab==='fuel'?'first':tab==='maint'?'nth':tab==='history'?'last'}-child`).classList.add('active');
+      document.getElementById(`tab-${tab}`).classList.add('active');
+    };
+
+    // 预览拍照
+    document.getElementById('photoInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      const preview = document.getElementById('photoPreview');
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (ev) => preview.innerHTML = `<img src="${ev.target.result}" style="max-height:150px;border-radius:12px;">`;
+        reader.readAsDataURL(file);
+      } else preview.innerHTML = '';
+    });
+
+    // 初始化
+    async function init() {
+      await openDB();
+      renderCarSelect();
+      refreshAll();
+    }
+
+    function refreshAll() {
+      updateStats();
+      renderHistory();
+    }
+
+    document.getElementById('carSelect').addEventListener('change', refreshAll);
+    init();
+
+    // 离线 Service Worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register(
+          URL.createObjectURL(new Blob([`
+            self.addEventListener('install', e => self.skipWaiting());
+            self.addEventListener('activate', e => e.waitUntil(clients.claim()));
+            self.addEventListener('fetch', e => e.respondWith(
+              caches.match(e.request).then(r => r || fetch(e.request).then(res => {
+                const clone = res.clone();
+                caches.open('v2').then(c => c.put(e.request, clone));
+                return res;
+              }))
+            ));
+          `], {type: 'application/javascript'}))
+        );
+      });
+    }
+  </script>
+</body>
+</html>
